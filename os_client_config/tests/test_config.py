@@ -12,6 +12,8 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
+import argparse
+
 from os_client_config import cloud_config
 from os_client_config import config
 from os_client_config import exceptions
@@ -49,3 +51,47 @@ class TestConfig(base.TestCase):
         cc = c.get_one_cloud(cloud='_test_cloud_', auth={'username': 'user'})
         self.assertEqual('user', cc.auth['username'])
         self.assertEqual('testpass', cc.auth['password'])
+
+
+class TestConfigArgparse(base.TestCase):
+
+    def test_get_one_cloud_argparse(self):
+        options = argparse.Namespace(
+            region_name='other-test-region',
+            snack_type='cookie',
+        )
+        c = config.OpenStackConfig(config_files=[self.cloud_yaml],
+                                   vendor_files=[self.vendor_yaml])
+
+        cc = c.get_one_cloud(cloud='', argparse=options)
+        self.assertIsNone(cc.cloud)
+        self.assertNotIn('username', cc.auth)
+        self.assertEqual(cc.region_name, 'other-test-region')
+        self.assertEqual(cc.snack_type, 'cookie')
+
+        cc = c.get_one_cloud(cloud='_test_cloud_', argparse=None)
+        self._assert_cloud_details(cc)
+        self.assertEqual(cc.region_name, 'test-region')
+        self.assertIsNone(cc.snack_type)
+
+        cc = c.get_one_cloud(cloud='_test_cloud_', argparse=options)
+        self._assert_cloud_details(cc)
+        self.assertEqual(cc.region_name, 'other-test-region')
+        self.assertEqual(cc.snack_type, 'cookie')
+
+
+class TestConfigDefault(base.TestCase):
+
+    def test_set_default(self):
+        c = config.OpenStackConfig(config_files=[self.cloud_yaml],
+                                   vendor_files=[self.vendor_yaml])
+        cc = c.get_one_cloud(cloud='_test_cloud_', argparse=None)
+        self._assert_cloud_details(cc)
+        self.assertEqual(cc.auth_type, 'password')
+
+        config.set_default('auth_type', 'token')
+        c = config.OpenStackConfig(config_files=[self.cloud_yaml],
+                                   vendor_files=[self.vendor_yaml])
+        cc = c.get_one_cloud(cloud='_test_cloud_', argparse=None)
+        self._assert_cloud_details(cc)
+        self.assertEqual(cc.auth_type, 'token')
